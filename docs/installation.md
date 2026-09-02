@@ -19,6 +19,7 @@
 10. [Настройка сети и firewall](#10-настройка-сети-и-firewall)
 11. [Проверка установки](#11-проверка-установки)
 12. [Автотесты firmware](#12-автотесты-firmware)
+    - [12.6 Скрипт deploy_and_test.sh](#126-скрипт-deploy_and_testsh)
 
 ---
 
@@ -781,6 +782,105 @@ MODELS_DIR=/opt/traffic_ai/models ./test_lpr --gtest_color=yes
 [==========] 4 tests from 2 test suites ran. (330 ms total)
 [  PASSED  ] 4 tests.
 ```
+
+### 12.6 Скрипт deploy_and_test.sh
+
+`tools/deploy_and_test.sh` — однокомандный способ собрать и запустить тесты прямо **на SOC** с хост-машины разработчика (Linux / macOS / WSL).
+
+Скрипт автоматически:
+1. Проверяет SSH-доступ к SOC.
+2. Устанавливает `cmake`, `g++`, `rsync`, `git` на SOC если их нет.
+3. Синхронизирует исходники через `rsync` (передаётся только diff).
+4. Собирает тестовые бинарники на SOC (`cmake + make -j$(nproc)`).
+5. Запускает `ctest -V` и выводит цветной итог.
+
+#### Требования на хосте
+
+- `bash`, `rsync`, `ssh` (в WSL на Windows: `wsl`-терминал)
+- SSH-доступ к SOC без пароля (рекомендуется SSH-ключ):
+  ```bash
+  ssh-keygen -t ed25519       # создать ключ (если нет)
+  ssh-copy-id root@10.0.0.5  # скопировать на SOC
+  ```
+
+#### Базовый запуск
+
+```bash
+# из корня репозитория
+./tools/deploy_and_test.sh <SOC_IP>
+
+# пример
+./tools/deploy_and_test.sh 10.0.0.5
+```
+
+#### Дополнительные варианты
+
+```bash
+# Указать пользователя и порт SSH
+./tools/deploy_and_test.sh 10.0.0.5 root 22
+
+# Полная пересборка (удалить build-кэш на SOC)
+CLEAN_BUILD=1 ./tools/deploy_and_test.sh 10.0.0.5
+
+# Пропустить синхронизацию — только сборка и запуск
+NO_RSYNC=1 ./tools/deploy_and_test.sh 10.0.0.5
+
+# Интеграционные тесты LPR (требуют .rknn моделей на SOC)
+MODELS_DIR=/opt/traffic_ai/models ./tools/deploy_and_test.sh 10.0.0.5
+```
+
+#### Ожидаемый вывод
+
+```
+▶ Проверка SSH-соединения с root@10.0.0.5:22
+✓ Соединение установлено
+   Архитектура: aarch64   ОС: Ubuntu 22.04.3 LTS
+
+▶ Проверка зависимостей на SOC
+✓ g++ — g++ (Ubuntu 13.x) 13.x.x
+✓ cmake — cmake version 3.28.3
+✓ rsync — rsync  version 3.x.x
+✓ git — git version 2.x.x
+
+▶ Синхронизация исходников → root@10.0.0.5:/opt/rv1126b_src
+✓ Исходники синхронизированы
+
+▶ Сборка тестов на SOC (cmake + make)
+[cmake] Конфигурируем ...
+-- Fetching GoogleTest v1.14.0 ...
+-- Configuring done
+[make] Собираем ...
+[100%] Built target test_violation
+✓ Сборка завершена
+
+▶ Запуск unit-тестов на SOC
+ 1/29 Test  #1: ZoneContainsCenter.CenterInsideZone ..........   Passed    0.00 sec
+ 2/29 Test  #2: ZoneContainsCenter.CenterOutsideZone_Left ....   Passed    0.00 sec
+...
+29/29 Test #29: EventPublisher.MultipleEventsMultipleLogs ....   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 29
+Total Test time (real) =   0.70 sec
+
+▶ Итог
+
+  ✓  29/29 тестов прошли
+```
+
+> **Первый запуск** занимает дольше: CMake скачивает GoogleTest (~30 MB) и компилирует его.  
+> Повторные запуски используют кэш — значительно быстрее.
+
+#### Типичные проблемы
+
+| Симптом                                | Решение                                                          |
+|----------------------------------------|------------------------------------------------------------------|
+| `Permission denied (publickey)`        | Скопируйте SSH-ключ: `ssh-copy-id root@<SOC_IP>`               |
+| `rsync: command not found` на хосте   | `sudo apt install rsync` или запускайте из WSL                  |
+| `cmake: No such file or directory`     | Скрипт установит cmake автоматически; нужен интернет на SOC     |
+| Ошибка скачивания GoogleTest           | SOC не имеет доступа в интернет; заранее установите `libgtest-dev` на SOC и добавьте `-DBUILD_TESTS_USE_SYSTEM_GTEST=ON` |
+| Тест падает только на SOC             | Запустите бинарник с `--gtest_color=yes` напрямую: `ssh root@<SOC_IP> "cd /opt/rv1126b_src/firmware/build_tests && ./test_violation"` |
+
+---
 
 ### 12.5 Структура тестов
 
