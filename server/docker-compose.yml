@@ -1,0 +1,84 @@
+version: "3.9"
+
+services:
+
+  api:
+    build: ./api
+    container_name: traffic_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://traffic:traffic@db:5432/traffic
+      SNAPSHOT_DIR: /snapshots
+      LOG_LEVEL: info
+    volumes:
+      - snapshots:/snapshots
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: traffic_mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"     # WebSocket
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt_data:/mosquitto/data
+
+  mqtt_subscriber:
+    build: ./mqtt
+    container_name: traffic_mqtt_sub
+    restart: unless-stopped
+    environment:
+      MQTT_HOST: mqtt
+      MQTT_PORT: "1883"
+      MQTT_TOPIC_PREFIX: "traffic/#"
+      DATABASE_URL: postgresql+psycopg2://traffic:traffic@db:5432/traffic
+    depends_on:
+      - mqtt
+      - db
+
+  db:
+    image: postgres:16-alpine
+    container_name: traffic_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: traffic
+      POSTGRES_PASSWORD: traffic
+      POSTGRES_DB: traffic
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traffic"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: traffic_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-postgresql-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - db
+
+volumes:
+  pg_data:
+  snapshots:
+  mqtt_data:
+  grafana_data:

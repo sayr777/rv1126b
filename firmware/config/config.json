@@ -1,0 +1,28 @@
+{
+  "front_cam_dev": "/dev/video0",
+  "front_cam_w":   1920,
+  "front_cam_h":   1080,
+  "front_cam_fps": 25,
+
+  "cabin_cam_dev": "/dev/video1",
+  "cabin_cam_w":   1280,
+  "cabin_cam_h":   720,
+  "cabin_cam_fps": 25,
+
+  "models": {
+    "vehicle_det": "models/vehicle_yolov8n.rknn",
+    "plate_det":   "models/plate_yolov8n.rknn",
+    "plate_ocr":   "models/lprnet_crnn.rknn",
+    "seatbelt_cls":"models/seatbelt_mbv2.rknn",
+    "phone_det":   "models/phone_yolov8n.rknn"
+  },
+
+  "dwell_threshold_sec": 3.0,
+  "zones_file": "config/zones.json",
+
+  "http_endpoint": "http://10.0.0.1:8080/event",
+  "mqtt_broker":   "tcp://10.0.0.1:1883",
+  "mqtt_topic":    "traffic/cam01",
+  "log_dir":       "logs",
+  "snapshot_dir":  "snapshots"
+}
