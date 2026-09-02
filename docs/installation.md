@@ -18,6 +18,7 @@
 9. [Автозапуск через systemd](#9-автозапуск-через-systemd)
 10. [Настройка сети и firewall](#10-настройка-сети-и-firewall)
 11. [Проверка установки](#11-проверка-установки)
+12. [Автотесты firmware](#12-автотесты-firmware)
 
 ---
 
@@ -322,6 +323,8 @@ cd firmware/build
 ctest --output-on-failure
 ```
 
+Полное описание сборки и запуска тестов — в разделе [12. Автотесты firmware](#12-автотесты-firmware).
+
 ---
 
 ## 7. Установка моделей
@@ -579,6 +582,219 @@ traffic_ai[1234]: [INFO] Zones loaded: 1 (waffle_main)
 traffic_ai[1234]: [INFO] Pipeline started — main_loop + cabin_loop
 traffic_ai[1234]: [INFO] FPS: 24.8  NPU load: 68%  CPU temp: 61°C
 ```
+
+---
+
+## 12. Автотесты firmware
+
+Тестовый набор написан на **GoogleTest** и не требует физических камер или NPU — все тесты запускаются на хосте (x86-64 или arm64). GoogleTest загружается автоматически через CMake `FetchContent`.
+
+### 12.1 Сборка тестов
+
+```bash
+cd /opt/traffic_ai          # корень репозитория
+mkdir -p firmware/build_tests && cd firmware/build_tests
+
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DBUILD_TESTS=ON        # включить тестовые цели
+
+make -j4
+```
+
+Ожидаемый вывод сборки:
+
+```
+-- Fetching GoogleTest v1.14.0 ...
+-- Configuring done
+-- Build files have been written to: .../firmware/build_tests
+[  8%] Building CXX object ...
+...
+[100%] Linking CXX executable test_zone
+[100%] Linking CXX executable test_bytetrack
+[100%] Linking CXX executable test_violation
+[100%] Linking CXX executable test_event_publisher
+[100%] Built target test_lpr
+```
+
+### 12.2 Запуск всех тестов через ctest
+
+```bash
+cd firmware/build_tests
+ctest --output-on-failure -V
+```
+
+Ожидаемый вывод при успешном прохождении (все 30 тестов):
+
+```
+UpdateCTestConfiguration from :/opt/traffic_ai/firmware/build_tests/CTestTestfile.cmake
+1/5 Testing: test_zone
+    Start 1: test_zone
+1: [==========] Running 11 tests from 4 test suites.
+1: [----------] 5 tests from ZoneContainsCenter
+1: [ RUN      ] ZoneContainsCenter.CenterInsideZone
+1: [       OK ] ZoneContainsCenter.CenterInsideZone (0 ms)
+1: [ RUN      ] ZoneContainsCenter.CenterOutsideZone_Left
+1: [       OK ] ZoneContainsCenter.CenterOutsideZone_Left (0 ms)
+1: [ RUN      ] ZoneContainsCenter.CenterOutsideZone_Above
+1: [       OK ] ZoneContainsCenter.CenterOutsideZone_Above (0 ms)
+1: [ RUN      ] ZoneContainsCenter.CenterOnBoundary
+1: [       OK ] ZoneContainsCenter.CenterOnBoundary (0 ms)
+1: [ RUN      ] ZoneContainsCenter.LargeBboxCenterOutside
+1: [       OK ] ZoneContainsCenter.LargeBboxCenterOutside (0 ms)
+1: [----------] 3 tests from ZoneOverlap
+1: [ RUN      ] ZoneOverlap.FullyInside
+1: [       OK ] ZoneOverlap.FullyInside (0 ms)
+1: [ RUN      ] ZoneOverlap.NoOverlap
+1: [       OK ] ZoneOverlap.NoOverlap (0 ms)
+1: [ RUN      ] ZoneOverlap.PartialOverlap
+1: [       OK ] ZoneOverlap.PartialOverlap (0 ms)
+1: [----------] 1 test from ZoneName
+1: [ RUN      ] ZoneName.ReturnsCorrectName
+1: [       OK ] ZoneName.ReturnsCorrectName (0 ms)
+1: [----------] 2 tests from LoadZones
+1: [ RUN      ] LoadZones.ParsesValidJson
+1: [       OK ] LoadZones.ParsesValidJson (0 ms)
+1: [ RUN      ] LoadZones.EmptyFile
+1: [       OK ] LoadZones.EmptyFile (0 ms)
+1: [==========] 11 tests from 4 test suites ran. (2 ms total)
+1: [  PASSED  ] 11 tests.
+1/5 Test #1: test_zone ........................   Passed    0.02 sec
+
+2/5 Testing: test_bytetrack
+    Start 2: test_bytetrack
+2: [==========] Running 7 tests from 1 test suite.
+2: [----------] 7 tests from ByteTrack
+2: [ RUN      ] ByteTrack.NewTrackAfterMinHits
+2: [       OK ] ByteTrack.NewTrackAfterMinHits (0 ms)
+2: [ RUN      ] ByteTrack.SingleDetectionSingleTrack
+2: [       OK ] ByteTrack.SingleDetectionSingleTrack (0 ms)
+2: [ RUN      ] ByteTrack.TwoDetectionsTwoTracks
+2: [       OK ] ByteTrack.TwoDetectionsTwoTracks (0 ms)
+2: [ RUN      ] ByteTrack.TrackIdPersistsAcrossFrames
+2: [       OK ] ByteTrack.TrackIdPersistsAcrossFrames (0 ms)
+2: [ RUN      ] ByteTrack.TrackRemovedAfterMaxLost
+2: [       OK ] ByteTrack.TrackRemovedAfterMaxLost (0 ms)
+2: [ RUN      ] ByteTrack.EmptyDetectionsEmptyTracks
+2: [       OK ] ByteTrack.EmptyDetectionsEmptyTracks (0 ms)
+2: [ RUN      ] ByteTrack.LowConfNotConfirmedImmediately
+2: [       OK ] ByteTrack.LowConfNotConfirmedImmediately (0 ms)
+2: [==========] 7 tests from 1 test suite ran. (0 ms total)
+2: [  PASSED  ] 7 tests.
+2/5 Test #2: test_bytetrack ...................   Passed    0.01 sec
+
+3/5 Testing: test_violation
+    Start 3: test_violation
+3: [==========] Running 6 tests from 1 test suite.
+3: [----------] 6 tests from ViolationDetector
+3: [ RUN      ] ViolationDetector.FiresAfterDwellThreshold
+3: [       OK ] ViolationDetector.FiresAfterDwellThreshold (151 ms)
+3: [ RUN      ] ViolationDetector.NoFireBeforeThreshold
+3: [       OK ] ViolationDetector.NoFireBeforeThreshold (0 ms)
+3: [ RUN      ] ViolationDetector.NoDoubleFire
+3: [       OK ] ViolationDetector.NoDoubleFire (80 ms)
+3: [ RUN      ] ViolationDetector.NoFireWhenOutsideZone
+3: [       OK ] ViolationDetector.NoFireWhenOutsideZone (80 ms)
+3: [ RUN      ] ViolationDetector.PlateAttachedToEvent
+3: [       OK ] ViolationDetector.PlateAttachedToEvent (80 ms)
+3: [ RUN      ] ViolationDetector.UnconfirmedTrackIgnored
+3: [       OK ] ViolationDetector.UnconfirmedTrackIgnored (80 ms)
+3: [==========] 6 tests from 1 test suite ran. (471 ms total)
+3: [  PASSED  ] 6 tests.
+3/5 Test #3: test_violation ...................   Passed    0.47 sec
+
+4/5 Testing: test_event_publisher
+    Start 4: test_event_publisher
+4: [==========] Running 5 tests from 1 test suite.
+4: [----------] 5 tests from EventPublisher
+4: [ RUN      ] EventPublisher.WritesLogFile
+4: [       OK ] EventPublisher.WritesLogFile (1 ms)
+4: [ RUN      ] EventPublisher.LogFileIsValidJson
+4: [       OK ] EventPublisher.LogFileIsValidJson (0 ms)
+4: [ RUN      ] EventPublisher.EventTypeInJson
+4: [       OK ] EventPublisher.EventTypeInJson (0 ms)
+4: [ RUN      ] EventPublisher.PlateStoredInJson
+4: [       OK ] EventPublisher.PlateStoredInJson (0 ms)
+4: [ RUN      ] EventPublisher.MultipleEventsMultipleLogs
+4: [       OK ] EventPublisher.MultipleEventsMultipleLogs (0 ms)
+4: [==========] 5 tests from 1 test suite ran. (1 ms total)
+4: [  PASSED  ] 5 tests.
+4/5 Test #4: test_event_publisher .............   Passed    0.01 sec
+
+5/5 Testing: test_lpr
+    Start 5: test_lpr
+5: [==========] Running 2 tests from 1 test suite.
+5: [----------] 2 tests from LprUtils
+5: [ RUN      ] LprUtils.NmsRemovesDuplicates
+5: [       OK ] LprUtils.NmsRemovesDuplicates (0 ms)
+5: [ RUN      ] LprUtils.CropResizeOutputSize
+5: [       OK ] LprUtils.CropResizeOutputSize (0 ms)
+5: [==========] 2 tests from 1 test suite ran. (0 ms total)
+5: [  PASSED  ] 2 tests.
+5/5 Test #5: test_lpr .........................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 5
+Total Test time (real) =   0.51 sec
+```
+
+### 12.3 Запуск отдельного теста
+
+```bash
+cd firmware/build_tests
+
+# Все тесты одного бинарника с подробным выводом
+./test_zone          --gtest_color=yes
+./test_bytetrack     --gtest_color=yes
+./test_violation     --gtest_color=yes
+./test_event_publisher --gtest_color=yes
+./test_lpr           --gtest_color=yes
+
+# Запустить только один конкретный тест
+./test_violation --gtest_filter=ViolationDetector.PlateAttachedToEvent
+
+# Запустить все тесты, совпадающие с паттерном
+./test_bytetrack --gtest_filter="ByteTrack.*"
+```
+
+### 12.4 Интеграционные тесты LPR (требуют .rknn моделей)
+
+Интеграционные тесты LPR pipeline автоматически пропускаются (`SKIPPED`) если переменная `MODELS_DIR` не задана. Для запуска с реальными моделями:
+
+```bash
+MODELS_DIR=/opt/traffic_ai/models ./test_lpr --gtest_color=yes
+```
+
+Ожидаемый вывод с моделями:
+
+```
+[==========] Running 4 tests from 2 test suites.
+[----------] 2 tests from LprUtils
+[ RUN      ] LprUtils.NmsRemovesDuplicates
+[       OK ] LprUtils.NmsRemovesDuplicates (0 ms)
+[ RUN      ] LprUtils.CropResizeOutputSize
+[       OK ] LprUtils.CropResizeOutputSize (0 ms)
+[----------] 2 tests from LprIntegration
+[ RUN      ] LprIntegration.LoadModelsWithoutCrash
+[       OK ] LprIntegration.LoadModelsWithoutCrash (312 ms)
+[ RUN      ] LprIntegration.ProcessBlankFrameNocrash
+[       OK ] LprIntegration.ProcessBlankFrameNocrash (18 ms)
+[==========] 4 tests from 2 test suites ran. (330 ms total)
+[  PASSED  ] 4 tests.
+```
+
+### 12.5 Структура тестов
+
+| Файл                       | Тест-суит              | Кол-во | Что проверяется                                          |
+|----------------------------|------------------------|--------|----------------------------------------------------------|
+| `test_zone.cpp`            | ZoneContainsCenter     | 5      | Попадание центра bbox в полигон зоны                     |
+|                            | ZoneOverlap            | 3      | Доля перекрытия bbox с зоной                             |
+|                            | ZoneName               | 1      | Имя зоны из конфига                                      |
+|                            | LoadZones              | 2      | Разбор `zones.json`, пустой файл                         |
+| `test_bytetrack.cpp`       | ByteTrack              | 7      | Подтверждение трека, два объекта, persistence ID, потеря |
+| `test_violation.cpp`       | ViolationDetector      | 6      | Dwell-time, повторный fire, прикрепление номера, фильтры |
+| `test_event_publisher.cpp` | EventPublisher         | 5      | Создание лог-файла, валидный JSON, поля type/plate       |
+| `test_lpr.cpp`             | LprUtils               | 2      | Unit (без NPU)                                           |
+|                            | LprIntegration         | 2      | Интеграция с .rknn (пропускается без MODELS_DIR)         |
 
 ---
 
