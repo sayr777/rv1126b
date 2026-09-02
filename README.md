@@ -166,6 +166,21 @@ python training/eval/eval_pipeline.py \
 
 Подробнее: [`docs/architecture.md`](docs/architecture.md), [`docs/algorithm.md`](docs/algorithm.md).
 
+## Документация
+
+| Документ | Содержание |
+|----------|-----------|
+| [`docs/installation.md`](docs/installation.md) | Установка ОС, RKNN runtime, камер, сборка, systemd, firewall |
+| [`docs/architecture.md`](docs/architecture.md) | Архитектура системы, схема установки на объекте |
+| [`docs/algorithm.md`](docs/algorithm.md) | Пошаговый алгоритм конвейера, таймлайн, фильтрация |
+| [`docs/api.md`](docs/api.md) | HTTP / MQTT / RTSP / REST API — протоколы и примеры |
+| [`docs/training_regulations.md`](docs/training_regulations.md) | Регламент обучения и дообучения моделей |
+| [`docs/maintenance_regulations.md`](docs/maintenance_regulations.md) | Регламент технического обслуживания |
+| [`hardware/bom.md`](hardware/bom.md) | Bill of Materials, стоимость, альтернативные SoM |
+| [`hardware/wiring.md`](hardware/wiring.md) | Схема подключения, распиновка, питание |
+| [`hardware/datasheets.md`](hardware/datasheets.md) | Даташиты: RV1126B, IMX335, OV4689, RKNN |
+| [`models/README.md`](models/README.md) | Описание моделей, источники, конвертация ONNX → RKNN |
+
 ## Взаимодействие с сервером
 
 Устройство отправляет события по HTTP POST и MQTT. Пример события:
