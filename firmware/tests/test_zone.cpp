@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "waffle/zone.hpp"
+#include <fstream>
 
 // Прямоугольная зона [0.3–0.7] × [0.4–0.75]
 static Zone make_rect_zone() {

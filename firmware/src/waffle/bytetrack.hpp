@@ -25,7 +25,8 @@ public:
         int   min_hits      = 3;     // frames before track confirmed
     };
 
-    explicit ByteTrack(Config cfg = {});
+    ByteTrack();
+    explicit ByteTrack(Config cfg);
 
     // Update tracker with detections from current frame.
     // Returns all *confirmed* active tracks.
